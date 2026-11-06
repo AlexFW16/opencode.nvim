@@ -165,6 +165,42 @@ describe('config_file.setup', function()
     state.jobs.set_server(original_server)
   end)
 
+  it('refetches the provider catalog when a fresh read is requested', function()
+    Promise.spawn(function()
+      local calls = 0
+      set_operations({
+        get_model_catalog = function()
+          calls = calls + 1
+          return Promise.new():resolve({ providers = {}, default = {} })
+        end,
+      })
+
+      config_file.get_opencode_providers():await()
+      config_file.get_opencode_providers():await()
+      assert.equals(1, calls)
+
+      config_file.get_opencode_providers({ fresh = true }):await()
+      assert.equals(2, calls)
+
+      config_file.invalidate_opencode_providers()
+      config_file.get_opencode_providers():await()
+      assert.equals(3, calls)
+    end):wait()
+  end)
+
+  it('invalidates the provider catalog on server provider and model updates', function()
+    config_file.setup()
+    local cached = Promise.new():resolve({ providers = {}, default = {} })
+
+    config_file.providers_promise = cached
+    vim.api.nvim_exec_autocmds('User', { pattern = 'OpencodeEvent:provider.updated' })
+    assert.is_nil(config_file.providers_promise)
+
+    config_file.providers_promise = cached
+    vim.api.nvim_exec_autocmds('User', { pattern = 'OpencodeEvent:model.updated' })
+    assert.is_nil(config_file.providers_promise)
+  end)
+
   it('get_opencode_project returns project', function()
     Promise.spawn(function()
       local project = { id = 'p1', name = 'X' }

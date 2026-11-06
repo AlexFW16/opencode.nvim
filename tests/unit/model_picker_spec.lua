@@ -3,6 +3,7 @@ local stub = require('luassert.stub')
 local Promise = require('opencode.promise')
 local base_picker = require('opencode.ui.base_picker')
 local model_picker = require('opencode.model_picker')
+local config_file = require('opencode.config_file')
 local server_job = require('opencode.server_job')
 local state = require('opencode.state')
 
@@ -49,5 +50,36 @@ describe('opencode.model_picker', function()
 
     assert.stub(ensure_server).was_called()
     assert.is_true(picker_opened)
+  end)
+
+  it('refetches the catalog each time models are loaded', function()
+    local catalog_calls = 0
+    stub(server_job, 'ensure_server').returns(Promise.new():resolve({
+      operations = {
+        get_model_catalog = function()
+          catalog_calls = catalog_calls + 1
+          return Promise.new():resolve({
+            providers = {
+              {
+                id = 'openai',
+                name = 'OpenAI',
+                models = {
+                  gpt = { id = 'gpt', name = 'GPT' },
+                },
+              },
+            },
+            default = {},
+          })
+        end,
+      },
+    }))
+
+    config_file.providers_promise = nil
+    state.jobs.clear_server()
+
+    model_picker._get_models():wait()
+    model_picker._get_models():wait()
+
+    assert.equals(2, catalog_calls)
   end)
 end)

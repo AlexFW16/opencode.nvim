@@ -106,9 +106,22 @@ M.get_workspace_snapshot_path = Promise.async(function(directory)
   return vim.fs.normalize(path)
 end)
 
+---Drop the cached catalog so the next read reflects server-side provider and
+---model changes, including refreshes from model discovery plugins.
+function M.invalidate_opencode_providers()
+  M.providers_promise = nil
+end
+
+---@class OpencodeProvidersOptions
+---@field fresh? boolean Bypass the cache and fetch the catalog again
+
+---@param opts? OpencodeProvidersOptions
 ---@return Promise<OpencodeProvidersResponse|nil>
-function M.get_opencode_providers()
+function M.get_opencode_providers(opts)
   sync_cache_connection()
+  if opts and opts.fresh then
+    M.invalidate_opencode_providers()
+  end
   if not M.providers_promise then
     M.providers_promise = resource('get_model_catalog')
   end
@@ -117,6 +130,19 @@ function M.get_opencode_providers()
     M.providers_promise = nil
     return nil
   end)
+end
+
+---Keep the catalog current when the server reports provider or model changes.
+function M.setup()
+  local group = vim.api.nvim_create_augroup('OpencodeModelCatalog', { clear = true })
+  vim.api.nvim_create_autocmd('User', {
+    group = group,
+    pattern = {
+      'OpencodeEvent:provider.updated',
+      'OpencodeEvent:model.updated',
+    },
+    callback = M.invalidate_opencode_providers,
+  })
 end
 
 --- Get model information for a specific provider and model

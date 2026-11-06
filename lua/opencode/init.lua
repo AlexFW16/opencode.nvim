@@ -56,6 +56,7 @@ function M.setup(opts)
   local config = require('opencode.config')
   config.setup(opts)
 
+  require('opencode.config_file').setup()
   require('opencode.ui.highlight').setup()
 
   state = require('opencode.state')

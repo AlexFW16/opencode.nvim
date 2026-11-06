@@ -5,7 +5,7 @@ local M = {}
 
 M._get_models = Promise.async(function()
   local config_file = require('opencode.config_file')
-  local response = config_file.get_opencode_providers():await()
+  local response = config_file.get_opencode_providers({ fresh = true }):await()
 
   if not response then
     return {}
